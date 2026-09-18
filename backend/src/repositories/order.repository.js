@@ -6,6 +6,13 @@ class OrderRepository {
     return Order.create(data);
   }
 
+  async findById(orderId) {
+    return Order.findById(orderId);
+  }
+
+  async findByOrderId(orderId) {
+    return Order.findOne({ orderId });
+  }
 
 }
 

@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import orderRoutes from "./routes/order.routes.js";
+import paymentRoutes from "./routes/payment.routes.js";
 const app = express();
 
 app.use(cors());
@@ -13,5 +14,6 @@ app.get("/api/auth", (req, res) => {
   })
 })
 app.use("/api/orders", orderRoutes);
+app.use("/api/payments", paymentRoutes);
 
 export default app;
