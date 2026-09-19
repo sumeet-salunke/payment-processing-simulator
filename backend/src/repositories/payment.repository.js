@@ -6,6 +6,24 @@ class PaymentRepository {
     return Payment.create(data);
   }
 
+  async findByPaymentId(paymentId) {
+    return Payment.findOne({ paymentId });
+  }
+
+  async updatePaymentStatus(paymentId, newStatus, historyEntry) {
+    return Payment.findOneAndUpdate(
+      { paymentId }, {
+      $set: {
+        status: newStatus
+      }, $push: {
+        history: historyEntry
+      }
+    }, {
+      returnDocument: "after"
+    }
+    )
+  }
+
 
 }
 

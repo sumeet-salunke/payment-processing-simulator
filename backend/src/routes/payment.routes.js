@@ -1,5 +1,5 @@
 import express from "express";
-import { createPayment } from "../controllers/payment.controller.js";
+import { createPayment, processPayment } from "../controllers/payment.controller.js";
 
 const router = express.Router();
 
@@ -8,6 +8,7 @@ const router = express.Router();
 
 router.post("/", createPayment);
 
+router.post("/:paymentId/process", processPayment);
 
 
 
