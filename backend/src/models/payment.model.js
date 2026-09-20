@@ -15,6 +15,10 @@ const paymentSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
+  attemptNumber: {
+    type: Number,
+    required: true,
+  },
   status: {
     type: String,
     enum: Object.values(PAYMENT_STATUS),
@@ -27,6 +31,9 @@ const paymentSchema = new mongoose.Schema({
   }]
 
 }, { timestamps: true });
+
+// Ensure unique attempt number per order
+paymentSchema.index({ orderId: 1, attemptNumber: 1 }, { unique: true });
 
 const Payment = mongoose.model("Payment", paymentSchema);
 
