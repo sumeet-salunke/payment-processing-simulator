@@ -1,6 +1,8 @@
-import { describe, it, beforeEach } from "node:test";
+import { describe, it, beforeEach, after } from "node:test";
 import assert from "node:assert/strict";
+import mongoose from "mongoose";
 import "dotenv/config";
+import "../src/config/dns.js";
 
 import { BUSINESS_INVARIANTS } from "../src/constants/invariants.constants.js";
 import { assertPaymentSystemConsistency } from "../src/helpers/invariantChecker.js";
@@ -21,7 +23,17 @@ import paymentWebhookService from "../src/services/paymentWebhook.service.js";
 import paymentProviderService from "../src/services/paymentProvider.service.js";
 import ApiError from "../src/utils/ApiError.js";
 
+await mongoose.connect(process.env.MONGO_URI || "mongodb://127.0.0.1:27017/payment_simulator");
+
 describe("Payment Processing Simulator - Reliability & Edge-Case Consistency Suite", () => {
+  after(async () => {
+    try {
+      const { webhookRetryQueue } = await import("../src/queues/webhookRetry.queue.js");
+      await webhookRetryQueue.close();
+    } catch {}
+    await mongoose.connection.close();
+  });
+
   beforeEach(() => {
     failureSimulationService.reset();
   });

@@ -2,6 +2,7 @@ import { describe, it, before, after, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import mongoose from "mongoose";
 import "dotenv/config";
+import "../src/config/dns.js";
 
 import orderRepository from "../src/repositories/order.repository.js";
 import paymentRepository from "../src/repositories/payment.repository.js";
@@ -17,7 +18,17 @@ import { generateOrderID } from "../src/helpers/generateOrderID.js";
 import { generatePaymentID } from "../src/helpers/generatePaymentID.js";
 import { verifyWebhookSignature, generateWebhookSignature } from "../src/helpers/webhookSignature.js";
 
+await mongoose.connect(process.env.MONGO_URI || "mongodb://127.0.0.1:27017/payment_simulator");
+
 describe("Payment Processing Simulator - Reliability & Failure Tests", () => {
+  after(async () => {
+    try {
+      const { webhookRetryQueue } = await import("../src/queues/webhookRetry.queue.js");
+      await webhookRetryQueue.close();
+    } catch {}
+    await mongoose.connection.close();
+  });
+
   beforeEach(() => {
     failureSimulationService.reset();
   });
@@ -37,6 +48,7 @@ describe("Payment Processing Simulator - Reliability & Failure Tests", () => {
     const payment = await paymentRepository.createPayment({
       paymentId,
       orderId,
+      attemptNumber: 1,
       amount: 1000,
       status: PAYMENT_STATUS.PROCESSING,
       history: [

@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import Payment from "../models/payment.model.js";
 
 class PaymentRepository {
@@ -41,6 +42,9 @@ class PaymentRepository {
   }
 
   async findLatestByOrderId(orderId, session = null) {
+    if (mongoose.connection.readyState !== 1) {
+      return null;
+    }
     const query = Payment.findOne({ orderId }).sort({ attemptNumber: -1, createdAt: -1 });
     if (session) {
       query.session(session);
@@ -52,6 +56,19 @@ class PaymentRepository {
     const query = Payment.find({ orderId })
       .sort({ attemptNumber: 1, createdAt: 1 })
       .select("paymentId orderId attemptNumber amount status history createdAt updatedAt -_id");
+    if (session) {
+      query.session(session);
+    }
+    return query;
+  }
+  async findActiveAttemptByOrderId(orderId, session = null) {
+    if (mongoose.connection.readyState !== 1) {
+      return null;
+    }
+    const query = Payment.findOne({
+      orderId,
+      status: "processing"
+    });
     if (session) {
       query.session(session);
     }

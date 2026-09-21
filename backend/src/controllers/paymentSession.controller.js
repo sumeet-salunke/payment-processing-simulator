@@ -17,6 +17,10 @@ export const getPaymentSession = asyncHandler(async (req, res) => {
 export const payThroughSession = asyncHandler(async (req, res) => {
   const { sessionId } = req.params;
   const { result } = req.body || {};
-  const executionResult = await paymentSessionService.payThroughSession(sessionId, { result });
+  const idempotencyKey = req.headers["idempotency-key"] || req.headers["Idempotency-Key"];
+  const executionResult = await paymentSessionService.payThroughSession(sessionId, {
+    result,
+    idempotencyKey
+  });
   return res.status(200).json(new ApiResponse(200, executionResult.message, executionResult.data));
 });

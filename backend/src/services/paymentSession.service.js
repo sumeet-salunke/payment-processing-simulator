@@ -1,6 +1,8 @@
 import paymentSessionRepository from "../repositories/paymentSession.repository.js";
 import orderRepository from "../repositories/order.repository.js";
+import paymentRepository from "../repositories/payment.repository.js";
 import paymentService from "./payment.service.js";
+import idempotencyService from "./idempotency.service.js";
 import ApiError from "../utils/ApiError.js";
 import { generateSessionID } from "../helpers/generateSessionID.js";
 import {
@@ -114,6 +116,9 @@ class PaymentSessionService {
 
     const qrPayload = this.getQrPayload(sessionId);
 
+    // Retrieve latest payment attempt for this order if any
+    const latestPayment = await paymentRepository.findLatestByOrderId(session.orderId);
+
     return {
       message: "Payment session retrieved successfully",
       data: {
@@ -123,7 +128,14 @@ class PaymentSessionService {
           amount: order.amount, // Authoritative order amount
           orderStatus: order.status,
           sessionStatus: effectiveSessionStatus,
-          expiresAt: session.expiresAt
+          expiresAt: session.expiresAt,
+          latestPayment: latestPayment
+            ? {
+                paymentId: latestPayment.paymentId,
+                attemptNumber: latestPayment.attemptNumber,
+                status: latestPayment.status
+              }
+            : null
         },
         qrPayload
       }
@@ -133,11 +145,39 @@ class PaymentSessionService {
   /**
    * Process payment through an active session
    */
-  async payThroughSession(sessionId, { result = "success" } = {}) {
+  async payThroughSession(sessionId, { result = "success", idempotencyKey = null } = {}) {
     if (!sessionId) {
       throw new ApiError(400, "sessionId required");
     }
 
+    // If an idempotencyKey is provided, check idempotency first so duplicate retries replay cached responses
+    if (idempotencyKey) {
+      const idempotencyResult = await idempotencyService.processWithIdempotency(
+        {
+          key: idempotencyKey,
+          paymentId: `SESSION-${sessionId}`,
+          endpoint: `/api/payment-sessions/${sessionId}/pay`,
+          body: { result }
+        },
+        async () => {
+          return this._executePayThroughSession(sessionId, { result });
+        }
+      );
+
+      return {
+        message: "Payment processed successfully",
+        data: idempotencyResult.response.data
+      };
+    }
+
+    const execResult = await this._executePayThroughSession(sessionId, { result });
+    return {
+      message: "Payment initiated and processed successfully",
+      data: execResult
+    };
+  }
+
+  async _executePayThroughSession(sessionId, { result = "success" } = {}) {
     let session = await paymentSessionRepository.findBySessionId(sessionId);
     if (!session) {
       throw new ApiError(404, "Payment session not found");
@@ -172,21 +212,14 @@ class PaymentSessionService {
       throw new ApiError(409, "Order is already paid. No further payment attempts allowed.");
     }
 
-    // Reuse existing payment creation service to generate a new payment attempt
-    // (Amount is strictly derived from Order, client amount cannot override)
     const paymentResult = await paymentService.createPayment(session.orderId);
     const payment = paymentResult.data;
-
-    // Execute payment processing through existing state machine & provider flow
     const processResult = await paymentService.processPayment(payment.paymentId, result);
 
     return {
-      message: "Payment initiated and processed successfully",
-      data: {
-        sessionId: session.sessionId,
-        orderId: session.orderId,
-        payment: processResult.data
-      }
+      sessionId: session.sessionId,
+      orderId: session.orderId,
+      payment: processResult.data
     };
   }
 }

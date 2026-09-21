@@ -1,15 +1,24 @@
-import { describe, it, beforeEach } from "node:test";
+import { describe, it, beforeEach, after } from "node:test";
 import assert from "node:assert/strict";
+import mongoose from "mongoose";
 import "dotenv/config";
+import "../src/config/dns.js";
 
 import idempotencyService from "../src/services/idempotency.service.js";
 import idempotencyKeyRepository from "../src/repositories/idempotencyKey.repository.js";
-import { IDEMPOTENCY_STATUS } from "../constants/idempotency.constants.js";
+import { IDEMPOTENCY_STATUS } from "../src/constants/idempotency.constants.js";
 import failureSimulationService from "../src/services/failureSimulation.service.js";
 import { FAILURE_MODES } from "../src/constants/failureSimulation.constants.js";
 import { generatePaymentID } from "../src/helpers/generatePaymentID.js";
+import { generateRequestFingerprint } from "../src/helpers/requestFingerprint.js";
+
+await mongoose.connect(process.env.MONGO_URI || "mongodb://127.0.0.1:27017/payment_simulator");
 
 describe("Client Request Idempotency Tests", () => {
+  after(async () => {
+    await mongoose.connection.close();
+  });
+
   beforeEach(() => {
     failureSimulationService.reset();
   });
@@ -147,11 +156,17 @@ describe("Client Request Idempotency Tests", () => {
       const key = `idem-${Date.now()}-E`;
       const paymentId = generatePaymentID();
 
+      const requestFingerprint = generateRequestFingerprint({
+        paymentId,
+        endpoint: `/api/payments/${paymentId}/process`,
+        body: { result: "success" }
+      });
+
       // Pre-seed an idempotency record stuck in PROCESSING
       await idempotencyKeyRepository.create({
         key,
         paymentId,
-        requestFingerprint: "pre-seeded-fingerprint",
+        requestFingerprint,
         status: IDEMPOTENCY_STATUS.PROCESSING,
         expiresAt: new Date(Date.now() + 60000)
       });
@@ -164,7 +179,11 @@ describe("Client Request Idempotency Tests", () => {
             async () => ({ message: "Should not run", data: {} })
           );
         },
-        /409/
+        (err) => {
+          assert.equal(err.statusCode, 409);
+          assert.match(err.message, /currently being processed/i);
+          return true;
+        }
       );
     });
   });

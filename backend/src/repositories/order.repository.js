@@ -37,6 +37,32 @@ class OrderRepository {
       options
     );
   }
+
+  async findExpiredPendingOrders(now = new Date(), limit = 50) {
+    return Order.find({
+      status: "pending",
+      expiresAt: { $ne: null, $lte: now }
+    }).limit(limit);
+  }
+
+  async cancelExpiredOrder(orderId, session = null) {
+    const options = { returnDocument: "after" };
+    if (session) {
+      options.session = session;
+    }
+
+    // Atomic conditional cancellation: only if still pending
+    return Order.findOneAndUpdate(
+      {
+        orderId,
+        status: "pending"
+      },
+      {
+        $set: { status: "cancelled" }
+      },
+      options
+    );
+  }
 }
 
 export default new OrderRepository();

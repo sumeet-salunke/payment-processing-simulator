@@ -24,6 +24,16 @@ class PaymentService {
       throw new ApiError(409, "Order is already paid. No further payment attempts allowed.");
     }
 
+    // Step 7 Hardening: Prevent in-flight attempt overlap
+    // If an existing attempt is currently PROCESSING, reject new attempt with 409 Conflict
+    const activeAttempt = await paymentRepository.findActiveAttemptByOrderId(orderId);
+    if (activeAttempt) {
+      throw new ApiError(
+        409,
+        `Payment attempt #${activeAttempt.attemptNumber} (${activeAttempt.paymentId}) is currently processing for this order. Please wait for it to complete.`
+      );
+    }
+
     // Step 4 & 10: Payment amount must ALWAYS come from the Order.
     // Client-provided amounts are completely ignored, never trusted.
     const paymentAmount = order.amount;

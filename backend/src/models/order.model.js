@@ -18,7 +18,13 @@ const orderSchema = new mongoose.Schema({
     type: String,
     enum: Object.values(ORDER_STATUS),
     required: true,
-    default: ORDER_STATUS.PENDING
+    default: ORDER_STATUS.PENDING,
+    index: true
+  },
+  expiresAt: {
+    type: Date,
+    default: null,
+    index: true
   }
 }, { timestamps: true });
 
