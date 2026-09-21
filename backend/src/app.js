@@ -3,6 +3,7 @@ import cors from "cors";
 import orderRoutes from "./routes/order.routes.js";
 import paymentRoutes from "./routes/payment.routes.js";
 import webhookRoutes from "./routes/webhook.routes.js";
+import paymentSessionRoutes from "./routes/paymentSession.routes.js";
 import { errorHandler } from "./middlewares/error.middleware.js";
 
 const app = express();
@@ -23,6 +24,7 @@ app.get("/api/health", (req, res) => {
 app.use("/api/orders", orderRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/webhooks", webhookRoutes);
+app.use("/api/payment-sessions", paymentSessionRoutes);
 
 // Error handling middleware (must be registered last)
 app.use(errorHandler);

@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import paymentRepository from "../repositories/payment.repository.js";
 import orderRepository from "../repositories/order.repository.js";
 import webhookEventRepository from "../repositories/webhookEvent.repository.js";
+import paymentSessionRepository from "../repositories/paymentSession.repository.js";
 import ApiError from "../utils/ApiError.js";
 import { PAYMENT_STATUS } from "../constants/payment.constants.js";
 import { ORDER_STATUS } from "../constants/order.constants.js";
@@ -311,6 +312,12 @@ class PaymentWebhookService {
       if (!updatedOrder) {
         throw new ApiError(404, `Order ${updatedPayment.orderId} not found`);
       }
+
+      // Step 12: Mark active payment sessions for this order as COMPLETED atomically
+      await paymentSessionRepository.completeActiveSessionsForOrder(
+        updatedPayment.orderId,
+        session
+      );
     }
 
     await webhookEventRepository.markProcessed(eventId, session);

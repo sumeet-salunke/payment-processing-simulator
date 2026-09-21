@@ -10,7 +10,7 @@ import { ORDER_STATUS } from "../constants/order.constants.js";
  * @param {Array<Object>} context.payments - All payment attempt documents for this order
  * @param {Array<Object>} [context.webhookEvents] - Webhook events associated with this order's payments
  */
-export const assertPaymentSystemConsistency = ({ order, payments = [], webhookEvents = [] }) => {
+export const assertPaymentSystemConsistency = ({ order, payments = [], webhookEvents = [], paymentSessions = [] }) => {
   assert.ok(order, "Invariant assertion failed: Order document must be provided");
   assert.ok(Array.isArray(payments), "Invariant assertion failed: Payments must be an array");
 
@@ -70,6 +70,19 @@ export const assertPaymentSystemConsistency = ({ order, payments = [], webhookEv
             `History Isolation Violated: Payment ${payment.paymentId} (attempt #${payment.attemptNumber}) contains foreign history message: "${entry.message}"`
           );
         }
+      }
+    }
+  }
+
+  // Payment Session Invariant: If order is PAID, associated sessions should be COMPLETED
+  if (Array.isArray(paymentSessions)) {
+    for (const session of paymentSessions) {
+      if (order.status === ORDER_STATUS.PAID) {
+        assert.equal(
+          session.status,
+          "completed",
+          `Session Invariant Violated: Order ${order.orderId} is PAID, but session ${session.sessionId} is '${session.status}'`
+        );
       }
     }
   }
